@@ -72,6 +72,10 @@ const trainerConfig = {
     title: 'Trener równań II',
     subtitle: 'Równania z liczbami całkowitymi i ułamkami.'
   }
+  rationals: {
+    title: 'Liczby wymierne',
+    subtitle: 'Dodawanie, odejmowanie, mnożenie i dzielenie (ułamki, dziesiętne, całkowite).'
+  }
 };
 
 const difficultyNames = ['Łatwy', 'Średni', 'Trudny'];
@@ -121,7 +125,7 @@ function pick(arr) {
 }
 
 function usesFractionAnswers() {
-  return state.selectedTrainer === 'fractions' || state.selectedTrainer === 'equations2';
+  return state.selectedTrainer === 'fractions' || state.selectedTrainer === 'equations2' || state.selectedTrainer === 'rationals';;
 }
 
 function eqFractionTex(fr) {
@@ -212,6 +216,17 @@ function formatFractionOperandTex(fr, op, style) {
 
 function parseFractionInput(raw) {
   const text = String(raw).trim().replace(',', '.');
+
+  // NOWE: Obsługa liczb dziesiętnych (zamiana na wewnętrzny ułamek)
+  const floatMatch = text.match(/^([+-]?\d*\.\d+)$/);
+  if (floatMatch) {
+    const val = parseFloat(floatMatch[1]);
+    const parts = floatMatch[1].split('.');
+    const len = parts[1] ? parts[1].length : 0;
+    const den = Math.pow(10, len);
+    const num = Math.round(val * den);
+    return normalizeFraction(num, den);
+  }
 
   const mixedMatch = text.match(/^([+-]?\d+)\s+(\d+)\/(\d+)$/);
   if (mixedMatch) {
@@ -451,6 +466,79 @@ function makeAdvancedExpression(limit) {
   return { expr, answer: ans };
 }
 
+function getRationalDifficultyLabel(level) {
+  if (state.mode === 'easy') return 'Dodawanie i odejmowanie';
+  if (state.mode === 'medium') return 'Mnożenie i podst. działania';
+  return 'Wszystkie działania (mieszane)';
+}
+
+function makeRationalOperand(level) {
+  const type = pick(['int', 'frac', 'dec']);
+  let n, d;
+
+  if (type === 'int') {
+    n = randInt(-12, 12);
+    d = 1;
+  } else if (type === 'dec') {
+    // Generowanie ułamków o mianownikach dających ładne ułamki dziesiętne
+    const denoms = [2, 4, 5, 10]; 
+    d = pick(denoms);
+    n = randInt(-25, 25);
+  } else {
+    const denoms = [2, 3, 4, 5, 6, 8, 10];
+    d = pick(denoms);
+    n = randInt(-20, 20);
+  }
+
+  if (n === 0) n = pick([2, 3, -2, -3]); // Omijamy zera dla ciekawszych przykładów
+
+  const fr = normalizeFraction(n, d);
+
+  let tex = '';
+  if (fr.d === 1) {
+    tex = `${fr.n}`;
+  } else if (type === 'dec' && (1000 % fr.d === 0)) {
+    // Bezpieczna zamiana na ułamek dziesiętny z polskim przecinkiem
+    tex = (fr.n / fr.d).toString().replace('.', ',');
+  } else {
+    tex = fractionToTex(fr, 'mixed');
+  }
+
+  return { fr, tex, isNegative: fr.n < 0 };
+}
+
+function makeRationalQuestion(level) {
+  const op = state.mode === 'easy' ? pick(['+', '-'])
+           : state.mode === 'medium' ? pick(['+', '-', '×'])
+           : pick(['+', '-', '×', '÷']);
+
+  let a = makeRationalOperand(level);
+  let b = makeRationalOperand(level);
+
+  // Zabezpieczenie przed dzieleniem przez zero
+  if (op === '÷' && b.fr.n === 0) {
+    b = { fr: {n: 1, d: 1}, tex: '1', isNegative: false };
+  }
+
+  let answerFr;
+  if (op === '+') answerFr = addFractions(a.fr, b.fr);
+  if (op === '-') answerFr = subFractions(a.fr, b.fr);
+  if (op === '×') answerFr = mulFractions(a.fr, b.fr);
+  if (op === '÷') answerFr = divFractions(a.fr, b.fr);
+
+  const texA = a.isNegative ? `(${a.tex})` : a.tex;
+  const needsParensB = b.isNegative || ((op === '×' || op === '÷') && b.tex.includes('\\frac'));
+  const texB = needsParensB ? `(${b.tex})` : b.tex;
+
+  // Renderowanie matematyczne (zmiana symboli na szkolne kropki i dwukropki)
+  const displayOp = op === '×' ? '\\cdot' : op === '÷' ? ':' : op;
+
+  return {
+    expr: `\\(${texA} ${displayOp} ${texB}\\)`,
+    answer: answerFr
+  };
+}
+
 function getEquationDifficultyLabel(level) {
   if (state.mode === 'easy') {
     return level <= 2 ? 'Równania proste' : 'Równania z 2 krokami';
@@ -617,6 +705,12 @@ function generateQuestion() {
     q = makeEquationQuestionFractions(level);
     els.answerInput.placeholder = 'Np. 3/4, 1 1/2, -2/3';
     els.answerInput.inputMode = 'text';
+    // [DODAJ TEN BLOK TUTAJ]
+  } else if (state.selectedTrainer === 'rationals') {
+    q = makeRationalQuestion(level);
+    els.answerInput.placeholder = 'Np. -1/2, 0,25, 1 3/4';
+    els.answerInput.inputMode = 'text';
+  // [KONIEC DODANEGO BLOKU]
   } else if (state.selectedTrainer === 'equations') {
     q = makeEquationQuestion(level);
     els.answerInput.placeholder = 'Wpisz wartość x';
@@ -656,6 +750,8 @@ function generateQuestion() {
     els.difficultyText.textContent = getEquationDifficultyLabel(level);
   } else if (state.selectedTrainer === 'equations2') {
     els.difficultyText.textContent = getEquationDifficultyLabel(level) + ' — ułamki';
+  } else if (state.selectedTrainer === 'rationals') {
+    els.difficultyText.textContent = getRationalDifficultyLabel(level); // DODANA LINIJKA
   } else {
     els.difficultyText.textContent = getDifficultyLabel(level);
   }
