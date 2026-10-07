@@ -125,7 +125,7 @@ function pick(arr) {
 }
 
 function usesFractionAnswers() {
-  return state.selectedTrainer === 'fractions' || state.selectedTrainer === 'equations2' || state.selectedTrainer === 'rationals';;
+  return state.selectedTrainer === 'fractions' || state.selectedTrainer === 'equations2' || state.selectedTrainer === 'rationals';
 }
 
 function eqFractionTex(fr) {
