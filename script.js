@@ -71,7 +71,7 @@ const trainerConfig = {
   equations2: {
     title: 'Trener równań II',
     subtitle: 'Równania z liczbami całkowitymi i ułamkami.'
-  }
+  }, // <--- TUTAJ BRAKOWAŁO PRZECINKA!
   rationals: {
     title: 'Liczby wymierne',
     subtitle: 'Dodawanie, odejmowanie, mnożenie i dzielenie (ułamki, dziesiętne, całkowite).'
